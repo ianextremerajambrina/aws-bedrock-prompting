@@ -7,43 +7,118 @@ import {
 
 // Send a prompt to Amazon Bedrock using the Converse API.
 
-const AWS_REGION = "eu-central-1";
+const DEFAULT_AWS_REGION = "eu-central-1";
+const DEFAULT_MODEL_ID = "nvidia.nemotron-super-3-120b";
+const DEFAULT_TEMPERATURE = 0.4;
+const DEFAULT_TOP_P = 0.2;
 
-// TODO: Send AWS_REGION, MODEL_ID, and PROMPT as command line arguments instead of hardcoding them in the script.
-// TODO: Also include the ability of having default values for these arguments if they are not provided by the user (except prompt, which is required)
+const NUMERIC_OPTIONS = {
+  "--temperature": { key: "temperature", min: 0, max: 1 },
+  "--top-p": { key: "topP", min: 0, max: 1 },
+  "--top-k": { key: "topK", min: 1, integer: true },
+  "--max-tokens": { key: "maxTokens", min: 1, integer: true },
+};
 
-// Set the model ID, e.g., Claude Haiku.
-// The "global." prefix enables cross-region inference, allowing the request
-// to be routed to the nearest available region for the specified model.
-const MODEL_ID = "nvidia.nemotron-super-3-120b";
-const PROMPT = process.argv[2]; // Same functionality as Python sys.argv. argv[2] includes the prompt passed as a command line argument with "<PROMPT>".
+const parseArguments = (args) => {
+  let awsRegion = DEFAULT_AWS_REGION;
+  let modelId = DEFAULT_MODEL_ID;
+  const generation = {
+    temperature: DEFAULT_TEMPERATURE,
+    topP: DEFAULT_TOP_P,
+  };
+  let index = 0;
+
+  while (index < args.length) {
+    const option = args[index];
+    if (option === "--") {
+      index += 1;
+      break;
+    }
+    if (!option.startsWith("--")) break;
+
+    if (
+      option !== "--aws-region" &&
+      option !== "--model-id" &&
+      !NUMERIC_OPTIONS[option]
+    ) {
+      throw new Error(`Unknown option: ${option}`);
+    }
+
+    const value = args[index + 1];
+    if (!value || value.startsWith("--")) {
+      throw new Error(`Missing value for ${option}`);
+    }
+
+    if (option === "--aws-region") awsRegion = value;
+    else if (option === "--model-id") modelId = value;
+    else {
+      const { key, min, max, integer } = NUMERIC_OPTIONS[option];
+      const number = Number(value);
+      if (
+        !Number.isFinite(number) ||
+        number < min ||
+        (max !== undefined && number > max) ||
+        (integer && !Number.isInteger(number))
+      ) {
+        throw new Error(`Invalid value for ${option}: ${value}`);
+      }
+      generation[key] = number;
+    }
+    index += 2;
+  }
+
+  const prompt = args.slice(index).join(" ");
+  if (!prompt.trim()) {
+    throw new Error(
+      "Prompt is required. Usage: node prompting.js [--aws-region REGION] [--model-id MODEL_ID] [--temperature 0-1] [--top-p 0-1] [--top-k INTEGER] [--max-tokens INTEGER] <prompt>",
+    );
+  }
+
+  return { awsRegion, modelId, prompt, generation };
+};
 
 const hello = async () => {
+  let awsRegion;
+  let modelId;
+  let prompt;
+  let generation;
 
-  console.log(`Model: ${MODEL_ID}\n`);
+  try {
+    ({ awsRegion, modelId, prompt, generation } = parseArguments(
+      process.argv.slice(2),
+    ));
+  } catch (error) {
+    console.error(`ERROR: ${error.message}`);
+    process.exitCode = 1;
+    return;
+  }
+
+  console.log(`Model: ${modelId}\n`);
 
   // Create a new Bedrock Runtime client instance.
-  const client = new BedrockRuntimeClient({ region: AWS_REGION });
+  
+  const client = new BedrockRuntimeClient({ region: awsRegion });
 
   // Create the command with the model ID, the user message, and a basic configuration.
 
-  // TODO: Adjust the command parameters to customize the model's behavior, such as temperature, max tokens, etc.
-  // To perform coding: Low Top P, Low Temperature
-
   const command = new ConverseCommand({
-    modelId: MODEL_ID,
+    modelId,
     messages: [
-      /*{
-        role: "system",
-        content: [{ text: "You are a coding assistant. Your work includes helping users with code-related questions and tasks. Be as brief as possible and align the code with the user's intent and clean code practices. Do not extend yourself unnecessarily and avoid ambiguous responses. If needed, ask for additional context." }],
-      }, */
       {
         role: "user",
-        content: [{ text: PROMPT }],
+        content: [{ text: prompt }],
       },
     ],
-    temperature: 0.4,
-    top_p: 0.2
+    inferenceConfig: {
+      temperature: generation.temperature,
+      topP: generation.topP,
+      ...(generation.maxTokens === undefined
+        ? {}
+        : { maxTokens: generation.maxTokens }),
+    },
+    ...(generation.topK === undefined
+      ? {}
+      : { additionalModelRequestFields: { top_k: generation.topK } }),
   });
 
   // Send the command to the model and wait for the response.
@@ -59,7 +134,7 @@ const hello = async () => {
       caught.name === "BedrockRuntimeServiceException"
     ) {
       console.error(
-        `ERROR: Can't invoke '${MODEL_ID}'. Reason: ${caught.message}`,
+        `ERROR: Can't invoke '${modelId}'. Reason: ${caught.message}`,
       );
       throw caught;
     }
