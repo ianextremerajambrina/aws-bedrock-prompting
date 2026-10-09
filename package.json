@@ -1,0 +1,28 @@
+{
+  "name": "uso-introductorio-amazon-bedrock",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "devEngines": {
+    "packageManager": {
+      "name": "pnpm",
+      "version": "12.4.2",
+      "onFail": "download"
+    }
+  },
+  "packageManager": "pnpm@12.4.2",
+  "type": "module",
+  "dependencies": {
+    "@aws-sdk/client-bedrock": "^3.1135.0",
+    "@aws-sdk/client-bedrock-runtime": "^3.1135.0",
+    "@aws/bedrock-token-generator": "^1.1.0",
+    "dotenv": "^18.0.0",
+    "openai": "^7.20.0"
+  }
+}

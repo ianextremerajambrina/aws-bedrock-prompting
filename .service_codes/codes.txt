@@ -1,0 +1,4 @@
+AmazonBedrockAgentCore
+AmazonBedrockFoundationModels
+AmazonBedrockService
+AmazonBedrock
