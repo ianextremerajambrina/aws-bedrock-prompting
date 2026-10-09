@@ -6,6 +6,11 @@ coverage/
 
 # Environment variables and secrets
 .env
+.agents
+.agents/*
+.github/*.md
+.aislop
+.aislop/*
 .env.*
 !.env.example
 .aws/
