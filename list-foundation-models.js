@@ -9,11 +9,14 @@ import {
 import dotenv from "dotenv";
 dotenv.config();
 
-const REGION = "eu-west-1";
+// TODO: The region is hard‑coded (`REGION = "eu-central-1"`). Move to an environment variable and fall back to default.
+const REGION = "eu-central-1";
 const client = new BedrockClient({ region: REGION });
 
+// TODO: The file mixes CLI entry point with business logic. Extract `listFoundationModels` as a pure async function returning data, leaving the script to handle I/O.
 export const main = async () => {
 
+  // TODO: No explicit error handling around AWS SDK calls; wrap in try/catch and surface meaningful messages.
   const command = new ListFoundationModelsCommand({});
 
   const response = await client.send(command);
@@ -21,6 +24,7 @@ export const main = async () => {
 
   console.log("Listing the available Bedrock foundation models:");
 
+  // TODO: **Logging** logic repeats for each model property. Create a formatter helper that builds the formatted string.
   for (const model of models) {
     console.log("=".repeat(42));
     console.log(` Model: ${model.modelId}`);

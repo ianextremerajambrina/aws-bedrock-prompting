@@ -4,14 +4,14 @@ import {
   ConverseCommand,
 } from "@aws-sdk/client-bedrock-runtime";
 
+import { config } from "dotenv";
+config({ path: ".env/project_variables.env" });
 
 // Send a prompt to Amazon Bedrock using the Converse API.
 
-const DEFAULT_AWS_REGION = "eu-central-1";
-const DEFAULT_MODEL_ID = "nvidia.nemotron-super-3-120b";
-const DEFAULT_TEMPERATURE = 0.4;
-const DEFAULT_TOP_P = 0.2;
+// We define the limits of each option, validating user input
 
+// TODO: **Magic numbers** (e.g., temperature range 0–1, top‑p, top‑k defaults) should be represented with descriptive constants or enums.
 const NUMERIC_OPTIONS = {
   "--temperature": { key: "temperature", min: 0, max: 1 },
   "--top-p": { key: "topP", min: 0, max: 1 },
@@ -19,13 +19,27 @@ const NUMERIC_OPTIONS = {
   "--max-tokens": { key: "maxTokens", min: 1, integer: true },
 };
 
+// TODO: **Configuration constants** (`DEFAULT_AWS_REGION`, `DEFAULT_MODEL_ID`, temperature/topP ranges) are scattered in the file. Centralise them in a `config.js` or environment‑based config.
+// Defining global variables for the AWS region, model ID, prompt, and generation parameters.
+//  These will be set based on command-line arguments or environment variables.
+
+let awsRegion = process.env.DEFAULT_AWS_REGION;
+let modelId = process.env.DEFAULT_MODEL_ID;
+let temperature = Number(process.env.DEFAULT_TEMPERATURE);
+let topP = Number(process.env.DEFAULT_TOP_P);
+let topK = Number(process.env.DEFAULT_TOP_K);
+let maxTokens = Number(process.env.DEFAULT_MAX_TOKENS);
+
+// TODO: **Argument parsing** is tightly coupled with command‑line logic. Extract into a dedicated `parseArguments` module and expose it for unit testing.
 const parseArguments = (args) => {
-  let awsRegion = DEFAULT_AWS_REGION;
-  let modelId = DEFAULT_MODEL_ID;
+  
   const generation = {
-    temperature: DEFAULT_TEMPERATURE,
-    topP: DEFAULT_TOP_P,
+    temperature,
+    topP,
+    topK,
+    maxTokens
   };
+
   let index = 0;
 
   while (index < args.length) {
@@ -36,6 +50,7 @@ const parseArguments = (args) => {
     }
     if (!option.startsWith("--")) break;
 
+    // TODO: **Error handling** uses generic `Error`. Define custom CLI error types to differentiate parsing errors from runtime errors.
     if (
       option !== "--aws-region" &&
       option !== "--model-id" &&
@@ -70,7 +85,7 @@ const parseArguments = (args) => {
   const prompt = args.slice(index).join(" ");
   if (!prompt.trim()) {
     throw new Error(
-      "Prompt is required. Usage: node prompting.js [--aws-region REGION] [--model-id MODEL_ID] [--temperature 0-1] [--top-p 0-1] [--top-k INTEGER] [--max-tokens INTEGER] <prompt>",
+      `Prompt is required. Usage: node prompting.js [--aws-region REGION] [--model-id MODEL_ID] [--temperature 0-1] [--top-p 0-1] [--top-k INTEGER] [--max-tokens INTEGER] <prompt>\nIf no parameters specified, defaults will be used from the .env/project_variables.env file.`,
     );
   }
 
@@ -78,14 +93,13 @@ const parseArguments = (args) => {
 };
 
 const hello = async () => {
-  let awsRegion;
-  let modelId;
   let prompt;
   let generation;
 
   try {
     ({ awsRegion, modelId, prompt, generation } = parseArguments(
       process.argv.slice(2),
+      console.log(process.argv.slice(2))
     ));
   } catch (error) {
     console.error(`ERROR: ${error.message}`);
@@ -93,10 +107,12 @@ const hello = async () => {
     return;
   }
 
+  // TODO: **Console output** is interleaved with business logic. Introduce a lightweight logger service that can be swapped out for tests.
   console.log(`Model: ${modelId}\n`);
 
   // Create a new Bedrock Runtime client instance.
-  
+
+  // TODO: **AWS client creation** is embedded in the script. Provide a factory function (`createBedrockClient`) so clients can be reused or mocked.
   const client = new BedrockRuntimeClient({ region: awsRegion });
 
   // Create the command with the model ID, the user message, and a basic configuration.
