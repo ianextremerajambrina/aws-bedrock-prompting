@@ -5,6 +5,7 @@ on:
     types:
       - opened
   workflow_dispatch: 
+  workflow_call: 
 
 jobs:
   run:
