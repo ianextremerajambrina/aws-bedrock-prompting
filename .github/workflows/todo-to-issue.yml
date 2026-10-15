@@ -26,3 +26,6 @@ jobs:
           else
             echo "No changes to commit"
           fi
+  call-reusable-workflow:
+    needs: build
+    uses: ianextremerajambrina/aws-bedrock-prompting/.github/workflows/auto-assign-issues.yml@main
