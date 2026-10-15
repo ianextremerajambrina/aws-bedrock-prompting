@@ -1,0 +1,19 @@
+name: Auto assign issues
+
+on:
+  issues:
+    types:
+      - opened
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    permissions:
+      issues: write
+    steps:
+      - name: Assign issues
+        uses: gustavofreze/auto-assign@2.1.0
+        with:
+          assignees: 'ianextremerajambrina,mrcaotico'
+          github_token: '${{ secrets.GITHUB_TOKEN }}'
+          assignment_options: 'ISSUE'
