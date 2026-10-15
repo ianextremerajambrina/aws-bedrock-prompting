@@ -9,10 +9,9 @@
 - **AWS client creation** is embedded in the script. Provide a factory function (`createBedrockClient`) so clients can be reused or mocked.
 
 ## list-foundation-models.js
-- The region is hard‑coded (`REGION = "eu-west-1"`). Move to an environment variable and fall back to default.
-- **Logging** logic repeats for each model property. Create a formatter helper that builds the formatted string.
-- The file mixes CLI entry point with business logic. Extract `listFoundationModels` as a pure async function returning data, leaving the script to handle I/O.
-- No explicit error handling around AWS SDK calls; wrap in try/catch and surface meaningful messages.
+- **Logging**: Extract a formatter helper function to construct the formatted model card string.
+- **Filter active models**: Filter models by `modelLifecycle.status === "ACTIVE"` before displaying them (currently all models are displayed, then active count is logged).
+- Optional: Make `listFoundationModels` purely functional by accepting `client` or options rather than catching errors and calling `process.exit(1)` directly.
 
 ## General Refactors
 - **Shared client factory**: a small module that reads region from env or config and returns a configured `BedrockClient`/`BedrockRuntimeClient` instance.
