@@ -27,6 +27,7 @@ export const main = async () => {
   }
 
   // TODO: Only display active models (filter before printing)
+  // Issue URL: https://github.com/ianextremerajambrina/aws-bedrock-prompting/issues/11
   const active = models.filter(
     (m) => m.modelLifecycle.status === "ACTIVE",
   ).length;
