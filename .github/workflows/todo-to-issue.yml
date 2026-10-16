@@ -29,3 +29,89 @@ jobs:
   call-reusable-workflow:
     needs: build
     uses: ianextremerajambrina/aws-bedrock-prompting/.github/workflows/auto-assign-issues.yml@main
+
+  dispatch-to-solver:
+    needs: call-reusable-workflow
+    runs-on: ubuntu-latest
+    steps:
+      - name: Fetch open issues needing solutions
+        id: issues
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          # Get all open issues as JSON
+          issues=$(gh issue list \
+            --repo "${{ github.repository }}" \
+            --state open \
+            --json number,title,body,labels \
+            --limit 100)
+
+          # Filter out issues that already have a bot solution comment
+          needs_solving="[]"
+          for row in $(echo "$issues" | jq -c '.[]'); do
+            number=$(echo "$row" | jq -r '.number')
+
+            # Check if a bot solution comment already exists
+            comments=$(gh api \
+              "repos/${{ github.repository }}/issues/${number}/comments" \
+              --jq '[.[] | select(.body | startswith("## 🤖 LM Studio Solution"))]')
+
+            comment_count=$(echo "$comments" | jq 'length')
+
+            if [ "$comment_count" -eq 0 ]; then
+              # No solution yet — dispatch it
+              needs_solving=$(echo "$needs_solving" | jq --argjson item "$row" '. + [$item]')
+            else
+              # Check if the latest solution was rejected (has 👎 reaction)
+              latest_comment_id=$(echo "$comments" | jq -r '.[-1].id')
+              reactions=$(gh api \
+                "repos/${{ github.repository }}/issues/comments/${latest_comment_id}/reactions" \
+                --jq '[.[] | select(.content == "-1")] | length')
+
+              if [ "$reactions" -gt 0 ]; then
+                # Solution was rejected — re-dispatch
+                needs_solving=$(echo "$needs_solving" | jq --argjson item "$row" '. + [$item]')
+                echo "Issue #${number}: previous solution rejected, re-dispatching"
+              else
+                echo "Issue #${number}: solution exists and not rejected, skipping"
+              fi
+            fi
+          done
+
+          echo "Issues to solve: $(echo "$needs_solving" | jq length)"
+          echo "$needs_solving" > /tmp/issues_to_solve.json
+
+      - name: Dispatch each issue to secondary repo
+        env:
+          SECONDARY_PAT: ${{ secrets.BOT_ACCOUNT_TOKEN }}
+        run: |
+          jq -c '.[]' /tmp/issues_to_solve.json | while read -r issue; do
+            number=$(echo "$issue" | jq -r '.number')
+            title=$(echo "$issue" | jq -r '.title')
+            body=$(echo "$issue" | jq -r '.body')
+
+            # Build the dispatch payload
+            payload=$(jq -n \
+              --arg event_type "solve-issue" \
+              --argjson number "$number" \
+              --arg title "$title" \
+              --arg body "$body" \
+              --arg source_repo "${{ github.repository }}" \
+              '{
+                event_type: $event_type,
+                client_payload: {
+                  issue_number: $number,
+                  issue_title: $title,
+                  issue_body: $body,
+                  source_repo: $source_repo
+                }
+              }')
+
+            curl -s -X POST \
+              -H "Accept: application/vnd.github+json" \
+              -H "Authorization: Bearer $SECONDARY_PAT" \
+              "https://api.github.com/repos/mrcaotico/my-repo-to-run-actions/dispatches" \
+              -d "$payload"
+
+            echo "✅ Dispatched issue #${number} to secondary repo"
+          done
