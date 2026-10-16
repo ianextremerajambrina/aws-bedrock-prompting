@@ -94,7 +94,7 @@ jobs:
 
             # Build the dispatch payload
             payload=$(jq -n \
-              --arg event_type "solve-issue" \
+              --arg event_type "solve-issue-colaborator" \
               --argjson number "$number" \
               --arg title "$title" \
               --arg body "$body" \
