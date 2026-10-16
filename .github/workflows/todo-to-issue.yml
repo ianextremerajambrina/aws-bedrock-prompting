@@ -47,8 +47,10 @@ jobs:
             --limit 100)
 
           # Filter out issues that already have a bot solution comment
+          # NOTE: 'while read -r' + process substitution avoids word-splitting
+          # on newlines, which would break multiline issue bodies in a 'for' loop.
           needs_solving="[]"
-          for row in $(echo "$issues" | jq -c '.[]'); do
+          while IFS= read -r row; do
             number=$(echo "$row" | jq -r '.number')
 
             # Check if a bot solution comment already exists
@@ -76,7 +78,7 @@ jobs:
                 echo "Issue #${number}: solution exists and not rejected, skipping"
               fi
             fi
-          done
+          done < <(echo "$issues" | jq -c '.[]')
 
           echo "Issues to solve: $(echo "$needs_solving" | jq length)"
           echo "$needs_solving" > /tmp/issues_to_solve.json
